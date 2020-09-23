@@ -19,7 +19,12 @@ def scrape():
    mars = mongo.db.mars
    mars_data = scraping.scrape_all()
    mars.update({}, mars_data, upsert=True)
-   return "Scraping Successful!<br>"
+   return """
+    Scraping sucessful<br>
+    <a href="http://127.0.0.1:5000">
+      View Page
+    </a>
+    """
 
 
 if __name__ == "__main__":
