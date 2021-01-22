@@ -1,19 +1,22 @@
 # Import Splinter, BeautifulSoup, Pandas, and Datetime
+import datetime as dt
+from webdriver_manager.chrome import ChromeDriverManager
 from splinter import Browser
 from bs4 import BeautifulSoup as soup
 import pandas as pd
-import datetime as dt
+import requests
 
 def scrape_all():
     # Initiate headless driver for deployment
-    browser = Browser("chrome", executable_path="chromedriver", headless=False)
+    executable_path = {'executable_path': ChromeDriverManager().install()}
+    browser = Browser('chrome', **executable_path)
 
-    news_title, news_paragraph = mars_news(browser)
+    news_title, news_p = mars_news(browser)
 
     # Run all scraping functions and store results in dictionary
     data = {
         "news_title": news_title,
-        "news_paragraph": news_paragraph,
+        "news_paragraph": news_p,
         "featured_image": featured_image(browser),
         "facts": mars_facts(),
         "last_modified": dt.datetime.now(),
@@ -60,12 +63,12 @@ def featured_image(browser):
     browser.visit(url)
 
     # Find and click the full image button
-    full_image_elem = browser.find_by_id('full_image')
+    full_image_elem = browser.find_by_css('div[class="SearchResultCard"]')
     full_image_elem.click()
 
     # Find the more info button and click that
-    browser.is_element_present_by_text('more info', wait_time=1)
-    more_info_elem = browser.links.find_by_partial_text('more info')
+    browser.is_element_present_by_css('div[class="BaseLightboxOpenButton"]', wait_time=2)
+    more_info_elem = browser.find_by_css('div[class="BaseLightboxOpenButton"]')
     more_info_elem.click()
 
     # Parse the resulting html with soup
@@ -75,13 +78,13 @@ def featured_image(browser):
     # Try/Except for error handling
     try:
         # Find the relative image url
-        img_url_rel = img_soup.select_one('figure.lede a img').get("src")
+        img_url_rel = img_soup.find('div',{'class':'BaseLightbox__slide__img'}).find('img').get("src")
 
     except AttributeError:
         return None
 
     # Use the base URL to create an absolute URL
-    img_url = f'https://www.jpl.nasa.gov{img_url_rel}'
+    img_url = img_url_rel
 
     return img_url
 
@@ -89,17 +92,21 @@ def featured_image(browser):
 def mars_facts():
     # Try/Except for error handeling
     try:
+        # Facts URL
+        facts_url = 'http://space-facts.com/mars/'
         # Download tables as pandas df
-        df = pd.read_html('http://space-facts.com/mars/')[0]
+        #df = pd.read_html(facts_url)[0]
+        df = pd.read_html(requests.get(facts_url).text)[0]
     except BaseException:
-        return None
+        return 'Error'
 
-    # Assign columns and set index for dataframe
-    df.columns=['description', 'Mars']
-    df.set_index('description', inplace=True)
+    # Table Formatting
+    df.columns=['Description', 'Mars']
+    df = df.to_html(index=False, classes="table table-striped")
+    # df = df.style.hide_index()
 
-    # Covert dataframe into HTML format, add bootstrap
-    return df.to_html(classes="table table-striped")
+    # Return table without index
+    return df
 
 # D1: Scrape High-Resolution Mars’ Hemisphere Images and Titles
 def hemispheres(browser):
